@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace GeorgRinger\Gdpr\Domain\Repository;
@@ -10,15 +11,15 @@ use GeorgRinger\Gdpr\Domain\Model\Dto\Table;
 use GeorgRinger\Gdpr\Log\LogManager;
 use GeorgRinger\Gdpr\Service\Randomization;
 use GeorgRinger\Gdpr\Service\TableInformation;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class RecordRepository extends BaseRepository
 {
-
     /** @var LogManager */
-    protected $logger;
+    protected object $logger;
 
     public function __construct()
     {
@@ -36,10 +37,7 @@ class RecordRepository extends BaseRepository
             ->add(GeneralUtility::makeInstance(GdprOnlyRestriction::class));
 
         return $queryBuilder
-            ->select('uid', $tableInformation->getTitleField(), $tableInformation->getGdprRestrictionField())
-            ->from($table)
-            ->execute()
-            ->fetchAll();
+            ->select('uid', $tableInformation->getTitleField(), $tableInformation->getGdprRestrictionField())->from($table)->executeQuery()->fetchAllAssociative();
     }
 
     public function getStatisticOfTable(string $table): array
@@ -53,41 +51,38 @@ class RecordRepository extends BaseRepository
 
         $rows = $queryBuilder
             ->select($restrictionFieldName)
-            ->selectLiteral('count(' . $restrictionFieldName . ') as count')
-            ->from($table)
-            ->groupBy($restrictionFieldName)
-            ->execute()
-            ->fetchAll();
+            ->selectLiteral('count('.$restrictionFieldName.') as count')
+            ->from($table)->groupBy($restrictionFieldName)->executeQuery()->fetchAllAssociative();
 
         return [
             'restricted' => (int) ($rows[1]['count'] ?? 0),
-            'public' => (int) ($rows[0]['count'] ?? 0)
+            'public' => (int) ($rows[0]['count'] ?? 0),
         ];
     }
 
-
-    public function enableRecord(string $table, int $id)
+    public function enableRecord(string $table, int $id): void
     {
         $this->switchGdprRestriction($table, $id, 0);
         $this->logger->log($table, $id, LogManager::STATUS_REENABLE);
     }
 
-    public function disableRecord(string $table, int $id)
+    public function disableRecord(string $table, int $id): void
     {
         $this->switchGdprRestriction($table, $id, 1);
         $this->logger->log($table, $id, LogManager::STATUS_RESTRICT);
     }
 
-    public function deleteRecord(string $table, int $id)
+    public function deleteRecord(string $table, int $id): void
     {
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
         $dataHandler->start([], []);
         $dataHandler->disableDeleteClause();
         $dataHandler->deleteEl($table, $id, true, true);
+
         $this->logger->log($table, $id, LogManager::STATUS_DELETE);
     }
 
-    public function randomizeRecord(string $table, int $id)
+    public function randomizeRecord(string $table, int $id): void
     {
         $tableInformation = Table::getInstance($table);
 
@@ -101,7 +96,7 @@ class RecordRepository extends BaseRepository
             $table,
             $newValues,
             [
-                'uid' => $id
+                'uid' => $id,
             ]
         );
         $this->logger->log($table, $id, LogManager::STATUS_RANDOMIZE);
@@ -111,7 +106,7 @@ class RecordRepository extends BaseRepository
     {
         $swords = $search->getSearchWord();
         $out = [];
-        if (!$swords) {
+        if ('' === $swords || '0' === $swords) {
             return [];
         }
 
@@ -122,12 +117,14 @@ class RecordRepository extends BaseRepository
             if (empty($conf['columns'])) {
                 continue;
             }
+
             $connection = $this->getConnection($table);
-            $tableColumns = $connection->getSchemaManager()->listTableColumns($table);
+            $tableColumns = $connection->createSchemaManager()->listTableColumns($table);
             $fieldsInDatabase = [];
             foreach ($tableColumns as $column) {
                 $fieldsInDatabase[] = $column->getName();
             }
+
             $fields = array_intersect(array_keys($conf['columns']), $fieldsInDatabase);
 
             $queryBuilder = $connection->createQueryBuilder();
@@ -137,16 +134,18 @@ class RecordRepository extends BaseRepository
             if ($search->isSensitiveOnly()) {
                 $queryBuilder->getRestrictions()->add(GeneralUtility::makeInstance(GdprOnlyRestriction::class));
             }
+
             $queryBuilder->count('*')->from($table);
             $likes = [];
-            $excapedLikeString = '%' . $queryBuilder->escapeLikeWildcards($swords) . '%';
+            $excapedLikeString = '%'.$queryBuilder->escapeLikeWildcards($swords).'%';
             foreach ($fields as $field) {
                 $likes[] = $queryBuilder->expr()->like(
                     $field,
-                    $queryBuilder->createNamedParameter($excapedLikeString, \PDO::PARAM_STR)
+                    $queryBuilder->createNamedParameter($excapedLikeString, Connection::PARAM_STR)
                 );
             }
-            $count = $queryBuilder->orWhere(...$likes)->execute()->fetchColumn(0);
+
+            $count = $queryBuilder->orWhere(...$likes)->executeQuery()->fetchOne();
 
             if ($count > 0) {
                 $queryBuilder = $connection->createQueryBuilder();
@@ -167,32 +166,33 @@ class RecordRepository extends BaseRepository
                 foreach ($fields as $field) {
                     $likes[] = $queryBuilder->expr()->like(
                         $field,
-                        $queryBuilder->createNamedParameter($excapedLikeString, \PDO::PARAM_STR)
+                        $queryBuilder->createNamedParameter($excapedLikeString, Connection::PARAM_STR)
                     );
                 }
-                $statement = $queryBuilder->orWhere(...$likes)->execute();
+
+                $statement = $queryBuilder->orWhere(...$likes)->executeQuery();
                 $lastRow = null;
-                while ($row = $statement->fetch()) {
+                while ($row = $statement->fetchAssociative()) {
                     $out[$table]['rows'][] = $row;
                 }
+
                 $out[$table]['meta'] = Table::getInstance($table);
             }
         }
+
         return $out;
     }
 
-    private function switchGdprRestriction(string $table, int $id, int $value)
+    private function switchGdprRestriction(string $table, int $id, int $value): void
     {
         $this->getConnection($table)->update(
             $table,
             [
-                Table::getInstance($table)->getGdprRestrictionField() => $value
+                Table::getInstance($table)->getGdprRestrictionField() => $value,
             ],
             [
-                'uid' => $id
+                'uid' => $id,
             ]
         );
     }
-
-
 }

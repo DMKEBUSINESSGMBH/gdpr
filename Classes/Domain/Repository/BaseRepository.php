@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace GeorgRinger\Gdpr\Domain\Repository;
@@ -10,7 +11,6 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 abstract class BaseRepository
 {
-
     protected function getConnection(string $table): Connection
     {
         return GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable($table);
@@ -20,5 +20,4 @@ abstract class BaseRepository
     {
         return $this->getConnection($table)->createQueryBuilder();
     }
-
 }

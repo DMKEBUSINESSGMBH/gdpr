@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace GeorgRinger\Gdpr\Command;
@@ -10,19 +11,20 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use TYPO3\CMS\Core\Cache\Exception\NoSuchCacheException;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class AnonymizeIpCommand extends Command
 {
-
-    const DEFAULT_AGE = 300;
+    public const DEFAULT_AGE = 300;
 
     /** @var LogManager */
     protected $logger;
 
     /**
-     * Configure the command by defining the name, options and arguments
+     * Configure the command by defining the name, options and arguments.
      */
     protected function configure()
     {
@@ -37,15 +39,10 @@ class AnonymizeIpCommand extends Command
     }
 
     /**
-     * @param InputInterface $input
-     * @param OutputInterface $output
-     *
      * @throws \InvalidArgumentException
-     * @throws \TYPO3\CMS\Core\Cache\Exception\NoSuchCacheException
-     *
-     * @return int
+     * @throws NoSuchCacheException
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->logger = GeneralUtility::makeInstance(LogManager::class);
 
@@ -60,6 +57,7 @@ class AnonymizeIpCommand extends Command
                 $table,
                 implode(', ', $allTables)
             ));
+
             return 0;
         }
 
@@ -73,8 +71,10 @@ class AnonymizeIpCommand extends Command
                 $targetField,
                 implode(', ', $allFields)
             ));
+
             return 0;
         }
+
         if (!in_array($ageField, $allFields, true)) {
             $io->warning(sprintf(
                 'The table "%s" does not contain the field "%s"! Available fields: %s',
@@ -82,23 +82,26 @@ class AnonymizeIpCommand extends Command
                 $ageField,
                 implode(', ', $allFields)
             ));
+
             return 0;
         }
 
-        $age = (int)$input->getArgument('age');
-        if ($age === 0) {
-            $io->warning(sprintf('No proper age given'));
+        $age = (int) $input->getArgument('age');
+        if (0 === $age) {
+            $io->warning('No proper age given');
+
             return 0;
         }
 
         $io->section(sprintf('Starting with table "%s", IP field "%s", age field "%s" and older than %d days', $table, $targetField, $ageField, $ageField));
         $this->update($table, $targetField, $ageField, $age);
+
         return 0;
     }
 
-    private function update(string $table, string $targetField, string $ageField, int $age)
+    private function update(string $table, string $targetField, string $ageField, int $age): void
     {
-        $timestamp = strtotime('-' . $age . ' days');
+        $timestamp = strtotime('-'.$age.' days');
 
         $connection = GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable($table);
         $queryBuilder = $connection->createQueryBuilder();
@@ -108,38 +111,35 @@ class AnonymizeIpCommand extends Command
             ->where(
                 $queryBuilder->expr()->lt(
                     $ageField,
-                    $queryBuilder->createNamedParameter($timestamp, \PDO::PARAM_INT)
+                    $queryBuilder->createNamedParameter($timestamp, Connection::PARAM_INT)
                 ),
                 $queryBuilder->expr()->neq(
                     $targetField,
-                    $queryBuilder->createNamedParameter('', \PDO::PARAM_STR)
+                    $queryBuilder->createNamedParameter('', Connection::PARAM_STR)
                 ),
                 $queryBuilder->expr()->notLike(
                     $targetField,
-                    $queryBuilder->createNamedParameter('%.0.0', \PDO::PARAM_STR)
+                    $queryBuilder->createNamedParameter('%.0.0', Connection::PARAM_STR)
                 ),
                 $queryBuilder->expr()->notLike(
                     $targetField,
-                    $queryBuilder->createNamedParameter('%::', \PDO::PARAM_STR)
+                    $queryBuilder->createNamedParameter('%::', Connection::PARAM_STR)
                 )
-            )
-            ->from($table)
-            ->execute();
+            )->from($table)->executeQuery();
 
-        while ($row = $result->fetch()) {
-            $ip = (string)$row[$targetField];
+        while ($row = $result->fetchAssociative()) {
+            $ip = (string) $row[$targetField];
 
             $connection->update(
                 $table,
                 [
-                    $targetField => IpAnonymizer::anonymizeIp($ip)
+                    $targetField => IpAnonymizer::anonymizeIp($ip),
                 ],
                 [
-                    'uid' => $row['uid']
+                    'uid' => $row['uid'],
                 ]
             );
             $this->logger->log($table, $row['uid'], LogManager::STATUS_IP_ANONYMIZE);
         }
     }
-
 }

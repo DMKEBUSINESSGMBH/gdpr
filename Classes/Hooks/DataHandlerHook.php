@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace GeorgRinger\Gdpr\Hooks;
@@ -11,9 +12,8 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class DataHandlerHook
 {
-
     /** @var LogManager */
-    protected $logManager;
+    protected object $logManager;
 
     public function __construct()
     {
@@ -25,21 +25,19 @@ class DataHandlerHook
      * detects that the new/updated record belongs to a table configured for
      * indexing through Solr, we add the record to the index queue.
      *
-     * @param string $status Status of the current operation, 'new' or 'update'
-     * @param string $table The table the record belongs to
-     * @param mixed $uid The record's uid, [integer] or [string] (like 'NEW...')
-     * @param array $fields The record's data
+     * @param string      $status  Status of the current operation, 'new' or 'update'
+     * @param string      $table   The table the record belongs to
+     * @param mixed       $uid     The record's uid, [integer] or [string] (like 'NEW...')
+     * @param array       $fields  The record's data
      * @param DataHandler $tceMain TYPO3 Core Engine parent object
-     * @return void
      */
     public function processDatamap_afterDatabaseOperations(
         $status,
         $table,
         $uid,
         array $fields,
-        DataHandler $tceMain
-    )
-    {
+        DataHandler $tceMain,
+    ): void {
         if (TableInformation::isTableEnabled($table)) {
             $tableInformation = Table::getInstance($table);
 

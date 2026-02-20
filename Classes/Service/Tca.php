@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace GeorgRinger\Gdpr\Service;
@@ -8,22 +9,15 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class Tca
 {
-    /** @var string */
-    protected $tableName = '';
-
     protected $fields = [];
 
     /**
      * Tca constructor.
-     *
-     * @param string $tableName
      */
-    public function __construct(string $tableName)
+    public function __construct(protected string $tableName)
     {
-        $this->tableName = $tableName;
-
         $GLOBALS['TCA'][$this->tableName]['ctrl']['gdpr'] = [
-            'enabled' => true
+            'enabled' => true,
         ];
     }
 
@@ -32,7 +26,7 @@ class Tca
         return GeneralUtility::makeInstance(self::class, $tableName);
     }
 
-    public function addRestriction(string $fieldName)
+    public function addRestriction(string $fieldName): static
     {
         $GLOBALS['TCA'][$this->tableName]['ctrl']['gdpr']['restriction_field'] = $fieldName;
         $this->fields[$fieldName] = [
@@ -40,14 +34,14 @@ class Tca
             'exclude' => true,
             'config' => [
                 'type' => 'check',
-                'default' => 0
-            ]
+                'default' => 0,
+            ],
         ];
 
         return $this;
     }
 
-    public function addRandomization(string $fieldName, array $randomizationOptions)
+    public function addRandomization(string $fieldName, array $randomizationOptions): static
     {
         $GLOBALS['TCA'][$this->tableName]['ctrl']['gdpr']['randomized_field'] = $fieldName;
         $GLOBALS['TCA'][$this->tableName]['ctrl']['gdpr']['randomize_mapping'] = $randomizationOptions['mapping'];
@@ -60,13 +54,14 @@ class Tca
             'config' => [
                 'type' => 'check',
                 'readOnly' => true,
-                'default' => 0
-            ]
+                'default' => 0,
+            ],
         ];
+
         return $this;
     }
 
-    public function add(string $position)
+    public function add(string $position): void
     {
         if (!empty($this->fields)) {
             ExtensionManagementUtility::addTCAcolumns($this->tableName, $this->fields);
@@ -82,5 +77,4 @@ class Tca
             );
         }
     }
-
 }

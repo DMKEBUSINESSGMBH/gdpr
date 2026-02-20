@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace GeorgRinger\Gdpr\Domain\Model\Dto;
@@ -8,8 +9,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class Table
 {
-    /** @var string */
-    protected $tableName = '';
+    protected string $tableName;
 
     /** @var string */
     protected $title = '';
@@ -49,7 +49,7 @@ class Table
         $this->tableName = $tableName;
         $this->title = $tcaCtrl['title'];
         $this->titleField = $tcaCtrl['label'];
-        $this->deletedField = isset($tcaCtrl['delete']) ? $tcaCtrl['delete'] : '';
+        $this->deletedField = $tcaCtrl['delete'] ?? '';
         $this->titleLabel = $GLOBALS['TCA'][$tableName]['columns'][$this->titleField]['label'] ?? '';
         $this->gdprRestrictionField = $tcaCtrl['gdpr']['restriction_field'] ?? '';
         $this->gdprRandomizedField = $tcaCtrl['gdpr']['randomized_field'] ?? '';
@@ -58,90 +58,56 @@ class Table
         $this->gdprExpirePeriod = $tcaCtrl['gdpr']['randomize_expirePeriod'] ?? 365;
     }
 
-    /**
-     * @param string $tableName
-     * @return Table
-     */
     public static function getInstance(string $tableName): self
     {
-        return GeneralUtility::makeInstance(__CLASS__, $tableName);
+        return GeneralUtility::makeInstance(self::class, $tableName);
     }
 
-    /**
-     * @return string
-     */
     public function getTableName(): string
     {
         return $this->tableName;
     }
 
-    /**
-     * @return string
-     */
     public function getTitle(): string
     {
         return $this->title;
     }
 
-    /**
-     * @return string
-     */
     public function getTitleField(): string
     {
         return $this->titleField;
     }
 
-    /**
-     * @return string
-     */
     public function getDeletedField(): string
     {
         return $this->deletedField;
     }
 
-    /**
-     * @return string
-     */
     public function getTitleLabel(): string
     {
         return $this->titleLabel;
     }
 
-    /**
-     * @return string
-     */
     public function getGdprRestrictionField(): string
     {
         return $this->gdprRestrictionField;
     }
 
-    /**
-     * @return string
-     */
     public function getGdprRandomizedField(): string
     {
         return $this->gdprRandomizedField;
     }
 
-    /**
-     * @return array
-     */
     public function getGdprRandomizeMapping(): array
     {
         return $this->gdprRandomizeMapping;
     }
 
-    /**
-     * @return string
-     */
     public function getGdprRandomizedDateField(): string
     {
         return $this->gdprRandomizedDateField;
     }
 
-    /**
-     * @return int
-     */
     public function getGdprExpirePeriod(): int
     {
         return $this->gdprExpirePeriod;
@@ -151,5 +117,4 @@ class Table
     {
         return !empty($this->gdprRandomizedField) && !empty($this->gdprRandomizeMapping);
     }
-
 }

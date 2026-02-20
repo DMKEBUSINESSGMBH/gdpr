@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace GeorgRinger\Gdpr\Domain\Repository;
@@ -6,6 +7,7 @@ namespace GeorgRinger\Gdpr\Domain\Repository;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Registry;
 use TYPO3\CMS\Core\Service\FlexFormService;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
@@ -14,17 +16,15 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class FormRepository extends BaseRepository
 {
-    /** @var UriBuilder */
-    protected $uriBuilder;
+    protected UriBuilder $uriBuilder;
 
-    /** @var Registry */
-    protected $registry;
+    protected Registry $registry;
 
-    /** @var FlexFormService */
-    protected $flexFormService;
+    protected FlexFormService $flexFormService;
 
-    const REGISTRY_NAMESPACE = 'gdpr_form';
-    const LOG_COUNT_PREVIEW = 5;
+    public const REGISTRY_NAMESPACE = 'gdpr_form';
+
+    public const LOG_COUNT_PREVIEW = 5;
 
     public function __construct()
     {
@@ -40,9 +40,11 @@ class FormRepository extends BaseRepository
         if (ExtensionManagementUtility::isLoaded('form')) {
             $data['ext-form'] = $this->getFormForms();
         }
+
         if (ExtensionManagementUtility::isLoaded('powermail')) {
             $data['ext-powermail'] = $this->getPowermailForms();
         }
+
         if (ExtensionManagementUtility::isLoaded('formhandler')) {
             $data['ext-formhandler'] = $this->getFormhandlerForms();
         }
@@ -50,7 +52,7 @@ class FormRepository extends BaseRepository
         return $data;
     }
 
-    public function setStatus($type, $id, bool $status)
+    public function setStatus(string $type, int $id, bool $status): void
     {
         $this->registry->set(self::REGISTRY_NAMESPACE, $this->getRegistryKey($type, $id), $status);
     }
@@ -62,11 +64,11 @@ class FormRepository extends BaseRepository
             ->select('*')
             ->from('tt_content')
             ->where(
-                $queryBuilder->expr()->eq('CType', $queryBuilder->createNamedParameter('list', \PDO::PARAM_STR)),
-                $queryBuilder->expr()->eq('list_type', $queryBuilder->createNamedParameter('powermail_pi1', \PDO::PARAM_STR))
+                $queryBuilder->expr()->eq('CType', $queryBuilder->createNamedParameter('list', Connection::PARAM_STR)),
+                $queryBuilder->expr()->eq('list_type', $queryBuilder->createNamedParameter('powermail_pi1', Connection::PARAM_STR))
             )
-            ->execute()
-            ->fetchAll();
+            ->executeQuery()
+            ->fetchAllAssociative();
 
         $logTable = 'tx_powermail_domain_model_mail';
 
@@ -74,16 +76,14 @@ class FormRepository extends BaseRepository
             $queryBuilder = $this->getQueryBuilder($logTable);
             if (!empty($row['pi_flexform'])) {
                 $settings = $this->flexFormService->convertFlexFormContentToArray($row['pi_flexform']);
-                $formId = (int)$settings['settings']['flexform']['main']['form'];
+                $formId = (int) $settings['settings']['flexform']['main']['form'];
 
                 $count = $queryBuilder
                     ->count('*')
                     ->from($logTable)
-                    ->where(
-                        $queryBuilder->expr()->eq('form', $queryBuilder->createNamedParameter($formId, \PDO::PARAM_INT))
-                    )
-                    ->execute()
-                    ->fetchColumn();
+                    ->where($queryBuilder->expr()->eq('form', $queryBuilder->createNamedParameter($formId, Connection::PARAM_INT)))
+                    ->executeQuery()
+                    ->fetchOne();
 
                 $finalPreviewRows = [];
                 if ($count > 0) {
@@ -91,13 +91,9 @@ class FormRepository extends BaseRepository
                         ->select('*')
                         ->from($logTable)
                         ->where(
-                            $queryBuilder->expr()->eq('form', $queryBuilder->createNamedParameter($formId, \PDO::PARAM_INT))
+                            $queryBuilder->expr()->eq('form', $queryBuilder->createNamedParameter($formId, Connection::PARAM_INT))
                         )
-                        ->setMaxResults(self::LOG_COUNT_PREVIEW)
-                        ->orderBy('uid', 'desc')
-                        ->execute()
-                        ->fetchAll();
-
+                        ->setMaxResults(self::LOG_COUNT_PREVIEW)->orderBy('uid', 'desc')->executeQuery()->fetchAllAssociative();
 
                     foreach ($previewRows as $previewRow) {
                         $finalPreviewRows[] = [
@@ -114,13 +110,12 @@ class FormRepository extends BaseRepository
                 $rows[$key]['_records'] = [
                     'formIdentifier' => $formId,
                     'totalCount' => $count,
-                    'previewRows' => $finalPreviewRows
+                    'previewRows' => $finalPreviewRows,
                 ];
             }
         }
 
-        $rows = $this->enhanceRows('powermail', $rows);
-        return $rows;
+        return $this->enhanceRows('powermail', $rows);
     }
 
     protected function getFormhandlerForms()
@@ -130,19 +125,18 @@ class FormRepository extends BaseRepository
             ->select('*')
             ->from('tt_content')
             ->where(
-                $queryBuilder->expr()->orX(
-                    $queryBuilder->expr()->andX(
-                        $queryBuilder->expr()->eq('CType', $queryBuilder->createNamedParameter('list', \PDO::PARAM_STR)),
-                        $queryBuilder->expr()->eq('list_type', $queryBuilder->createNamedParameter('formhandler_pi1', \PDO::PARAM_STR))
-
+                $queryBuilder->expr()->or(
+                    $queryBuilder->expr()->and(
+                        $queryBuilder->expr()->eq('CType', $queryBuilder->createNamedParameter('list', Connection::PARAM_STR)),
+                        $queryBuilder->expr()->eq('list_type', $queryBuilder->createNamedParameter('formhandler_pi1', Connection::PARAM_STR))
                     ),
-                    $queryBuilder->expr()->andX(
-                        $queryBuilder->expr()->eq('CType', $queryBuilder->createNamedParameter('formhandler_pi1', \PDO::PARAM_STR))
+                    $queryBuilder->expr()->and(
+                        $queryBuilder->expr()->eq('CType', $queryBuilder->createNamedParameter('formhandler_pi1', Connection::PARAM_STR))
                     )
                 )
             )
-            ->execute()
-            ->fetchAll();
+            ->executeQuery()
+            ->fetchAllAssociative();
 
         $logTable = 'tx_formhandler_log';
 
@@ -152,11 +146,9 @@ class FormRepository extends BaseRepository
             $count = $queryBuilder
                 ->count('*')
                 ->from($logTable)
-                ->where(
-                    $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($row['pid'], \PDO::PARAM_INT))
-                )
-                ->execute()
-                ->fetchColumn();
+                ->where($queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($row['pid'], Connection::PARAM_INT)))
+                ->executeQuery()
+                ->fetchOne();
 
             $finalPreviewRows = [];
             if ($count > 0) {
@@ -164,12 +156,9 @@ class FormRepository extends BaseRepository
                     ->select('*')
                     ->from($logTable)
                     ->where(
-                        $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($row['pid'], \PDO::PARAM_INT))
+                        $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($row['pid'], Connection::PARAM_INT))
                     )
-                    ->setMaxResults(self::LOG_COUNT_PREVIEW)
-                    ->orderBy('uid', 'desc')
-                    ->execute()
-                    ->fetchAll();
+                    ->setMaxResults(self::LOG_COUNT_PREVIEW)->orderBy('uid', 'desc')->executeQuery()->fetchAllAssociative();
 
                 foreach ($previewRows as $previewRow) {
                     $data = unserialize($previewRow['params'], ['allowed_classes' => false]);
@@ -177,7 +166,7 @@ class FormRepository extends BaseRepository
                         'uid' => $previewRow['uid'],
                         'tstamp' => $previewRow['tstamp'],
                         'senderName' => $data['name'],
-                        'senderEmail' => $previewRow['email']
+                        'senderEmail' => $previewRow['email'],
                     ];
                 }
             }
@@ -185,12 +174,11 @@ class FormRepository extends BaseRepository
             $rows[$key]['_records'] = [
                 'formIdentifier' => $row['pid'],
                 'totalCount' => $count,
-                'previewRows' => $finalPreviewRows
+                'previewRows' => $finalPreviewRows,
             ];
         }
 
-        $rows = $this->enhanceRows('formhandler', $rows);
-        return $rows;
+        return $this->enhanceRows('formhandler', $rows);
     }
 
     protected function getFormForms()
@@ -199,17 +187,14 @@ class FormRepository extends BaseRepository
         $rows = $queryBuilder
             ->select('*')
             ->from('tt_content')
-            ->where(
-                $queryBuilder->expr()->eq('CType', $queryBuilder->createNamedParameter('form_formframework', \PDO::PARAM_STR))
-            )
-            ->execute()
-            ->fetchAll();
+            ->where($queryBuilder->expr()->eq('CType', $queryBuilder->createNamedParameter('form_formframework', Connection::PARAM_STR)))
+            ->executeQuery()
+            ->fetchAllAssociative();
 
-        $rows = $this->enhanceRows('form', $rows);
-        return $rows;
+        return $this->enhanceRows('form', $rows);
     }
 
-    protected function enhanceRows(string $type, array $rows)
+    protected function enhanceRows(string $type, array $rows): array
     {
         foreach ($rows as $key => $row) {
             $status = $this->registry->get(self::REGISTRY_NAMESPACE, $this->getRegistryKey($type, $row['uid']), false);
@@ -217,10 +202,10 @@ class FormRepository extends BaseRepository
                 'type' => $type,
                 'isValidated' => $status,
                 'links' => [
-                    'editContentElement' => $this->createEditUri('tt_content', $row['uid'])
+                    'editContentElement' => $this->createEditUri('tt_content', $row['uid']),
                 ],
                 'page' => BackendUtility::getRecord('pages', $row['pid']),
-                'path' => BackendUtility::getRecordPath($row['pid'], $this->getBackendUser()->getPagePermsClause(Permission::PAGE_SHOW), 1000)
+                'path' => BackendUtility::getRecordPath($row['pid'], $this->getBackendUser()->getPagePermsClause(Permission::PAGE_SHOW), 1000),
             ];
         }
 
@@ -237,18 +222,17 @@ class FormRepository extends BaseRepository
         $urlParameters = [
             'edit' => [
                 $table => [
-                    $id => 'edit'
-                ]
+                    $id => 'edit',
+                ],
             ],
-            'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')
+            'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI'),
         ];
-        return (string)$this->uriBuilder->buildUriFromRoute('record_edit', $urlParameters);
+
+        return (string) $this->uriBuilder->buildUriFromRoute('record_edit', $urlParameters);
     }
 
     /**
      * Returns the current BE user.
-     *
-     * @return BackendUserAuthentication
      */
     protected function getBackendUser(): BackendUserAuthentication
     {

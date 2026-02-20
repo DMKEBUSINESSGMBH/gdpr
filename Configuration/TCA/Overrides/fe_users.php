@@ -1,7 +1,8 @@
 <?php
-defined('TYPO3_MODE') or die();
 
-$tca = \GeorgRinger\Gdpr\Service\Tca::getInstance('fe_users');
+defined('TYPO3') || exit;
+
+$tca = GeorgRinger\Gdpr\Service\Tca::getInstance('fe_users');
 $tca
     ->addRestriction('gdpr_restricted')
     ->addRandomization('gdpr_randomized', [
@@ -18,6 +19,6 @@ $tca
             'last_name' => 'lastName',
             'telephone' => 'e164PhoneNumber',
             'fax' => 'e164PhoneNumber',
-        ]
+        ],
     ])
     ->add('after:disable');

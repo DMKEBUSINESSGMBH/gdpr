@@ -1,39 +1,45 @@
 <?php
+
 declare(strict_types=1);
 
 namespace GeorgRinger\Gdpr\Domain\Repository;
 
 use GeorgRinger\Gdpr\Domain\Model\Dto\LogFilter;
+use TYPO3\CMS\Core\Context\Context;
+use TYPO3\CMS\Core\Database\Connection;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 
 class LogRepository extends BaseRepository
 {
-
-    const LOG_TABLE = 'tx_gdpr_domain_model_log';
+    public const LOG_TABLE = 'tx_gdpr_domain_model_log';
 
     public function filter(LogFilter $filter): array
     {
         $queryBuilder = $this->getQueryBuilder(self::LOG_TABLE);
 
         $where = [];
-        if (!empty($filter->getTableName())) {
-            $where[] = $queryBuilder->expr()->like('table_name', $queryBuilder->createNamedParameter($filter->getTableName(), \PDO::PARAM_STR));
+        if (!in_array($filter->getTableName(), ['', '0'], true)) {
+            $where[] = $queryBuilder->expr()->like('table_name', $queryBuilder->createNamedParameter($filter->getTableName(), Connection::PARAM_STR));
         }
-        if ($filter->getStatus()) {
-            $where[] = $queryBuilder->expr()->eq('status', $queryBuilder->createNamedParameter($filter->getStatus(), \PDO::PARAM_INT));
+
+        if (0 !== $filter->getStatus()) {
+            $where[] = $queryBuilder->expr()->eq('status', $queryBuilder->createNamedParameter($filter->getStatus(), Connection::PARAM_INT));
         }
+
         $dateFrom = $filter->getDateFrom();
-        if ($dateFrom) {
+        if ('' !== $dateFrom && '0' !== $dateFrom) {
             $date = $this->getTimeRestriction($dateFrom);
-            if ($date) {
-                $where[] = $queryBuilder->expr()->gte('tstamp', $queryBuilder->createNamedParameter($date, \PDO::PARAM_INT));
+            if (0 !== $date) {
+                $where[] = $queryBuilder->expr()->gte('tstamp', $queryBuilder->createNamedParameter($date, Connection::PARAM_INT));
             }
         }
+
         $dateTo = $filter->getDateTo();
-        if ($dateTo) {
+        if ('' !== $dateTo && '0' !== $dateTo) {
             $date = $this->getTimeRestriction($dateTo);
-            if ($date) {
-                $where[] = $queryBuilder->expr()->lte('tstamp', $queryBuilder->createNamedParameter($date, \PDO::PARAM_INT));
+            if (0 !== $date) {
+                $where[] = $queryBuilder->expr()->lte('tstamp', $queryBuilder->createNamedParameter($date, Connection::PARAM_INT));
             }
         }
 
@@ -43,22 +49,18 @@ class LogRepository extends BaseRepository
             ->setMaxResults($filter->getLimit())
             ->orderBy('tstamp', 'desc');
 
-        if (!empty($where)) {
+        if ([] !== $where) {
             $res->where(...$where);
         }
 
-        return $res->execute()->fetchAll();
+        return $res->executeQuery()->fetchAllAssociative();
     }
 
-    /**
-     * @param string|int $timeInput
-     * @return int
-     */
-    private function getTimeRestriction($timeInput): int
+    private function getTimeRestriction(string $timeInput): int
     {
         $timeLimit = 0;
         if (MathUtility::canBeInterpretedAsInteger($timeInput)) {
-            $timeLimit = $GLOBALS['SIM_EXEC_TIME'] - $timeInput;
+            $timeLimit = GeneralUtility::makeInstance(Context::class)->getPropertyFromAspect('date', 'timestamp') - $timeInput;
         } else {
             $timeByFormat = \DateTime::createFromFormat('HH:mm DD-MM-YYYY', $timeInput);
             if ($timeByFormat) {
@@ -72,7 +74,7 @@ class LogRepository extends BaseRepository
                 }
             }
         }
+
         return $timeLimit;
     }
-
 }

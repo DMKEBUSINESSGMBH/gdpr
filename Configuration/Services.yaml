@@ -29,3 +29,15 @@ services:
                 name: 'console.command'
                 command: 'gdpr:anonymizeIp'
                 description: 'Anonymize IP address of given rows'
+
+    GeorgRinger\Gdpr\EventListener\ModifyButtonBar:
+        tags:
+            -
+                name: event.listener
+                identifier: 'gdpr/modify-button-bar'
+
+    GeorgRinger\Gdpr\EventListener\ModifyRecordOverlayIconIdentifier:
+        tags:
+            -
+                name: event.listener
+                identifier: 'gdpr/modify-record-overlay-icon-identifier'

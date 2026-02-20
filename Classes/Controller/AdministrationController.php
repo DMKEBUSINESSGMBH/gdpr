@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace GeorgRinger\Gdpr\Controller;
@@ -10,55 +11,64 @@ use GeorgRinger\Gdpr\Domain\Repository\FormRepository;
 use GeorgRinger\Gdpr\Domain\Repository\LogRepository;
 use GeorgRinger\Gdpr\Domain\Repository\RecordRepository;
 use GeorgRinger\Gdpr\Service\TableInformation;
+use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Backend\Template\Components\ButtonBar;
-use TYPO3\CMS\Backend\View\BackendTemplateView;
+use TYPO3\CMS\Backend\Template\ModuleTemplate;
+use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
-use TYPO3\CMS\Core\Imaging\Icon;
+use TYPO3\CMS\Core\Http\PropagateResponseException;
 use TYPO3\CMS\Core\Imaging\IconFactory;
+use TYPO3\CMS\Core\Imaging\IconSize;
+use TYPO3\CMS\Core\Localization\DateFormatter;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Extbase\Http\ForwardResponse;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
-use TYPO3\CMS\Extbase\Mvc\View\ViewInterface;
 use TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder;
 
 class AdministrationController extends ActionController
 {
-
-    /** @var BackendTemplateView */
-    protected $view;
-
-    /** @var string */
-    protected $defaultViewObjectName = BackendTemplateView::class;
-
     /** @var RecordRepository */
     protected $recordRepository;
 
-    public function initializeAction()
+    protected ModuleTemplate $moduleTemplate;
+
+    public function __construct(private readonly ModuleTemplateFactory $moduleTemplateFactory)
+    {
+    }
+
+    protected function initializeAction(): void
     {
         $this->recordRepository = GeneralUtility::makeInstance(RecordRepository::class);
 
-        if ($this->request->getControllerActionName() !== 'moduleNotEnabled' && (int)$this->getBackendUser()->user['gdpr_module_enable'] === 0) {
-            $this->redirect('moduleNotEnabled');
+        if ('moduleNotEnabled' !== $this->request->getControllerActionName() && 0 === (int) $this->getBackendUser()->user['gdpr_module_enable']) {
+            throw new PropagateResponseException($this->redirect('moduleNotEnabled'));
         }
     }
 
-    public function initializeView(ViewInterface $view)
+    /**
+     * @param \TYPO3Fluid\Fluid\View\ViewInterface $view
+     */
+    public function initializeView($view): void
     {
+        $this->moduleTemplate = $this->moduleTemplateFactory->create($this->request);
         $pageRenderer = GeneralUtility::makeInstance(PageRenderer::class);
-        $pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/Modal');
-        $pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/DateTimePicker');
-        $pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/Tooltip');
+        $pageRenderer->loadJavaScriptModule('@typo3/backend/modal.js');
+        $pageRenderer->loadJavaScriptModule('@gdpr/date-picker.js');
 
-        $dateFormat = ($GLOBALS['TYPO3_CONF_VARS']['SYS']['USdateFormat'] ? ['MM-DD-YYYY', 'HH:mm MM-DD-YYYY'] : ['DD-MM-YYYY', 'HH:mm DD-MM-YYYY']);
+        $formatter = new DateFormatter();
+        $dateFormat = [];
+        $dateFormat[0] = $formatter->convertPhpFormatToLuxon($GLOBALS['TYPO3_CONF_VARS']['SYS']['ddmmyy'] ?? 'd.m.Y');
+        $dateFormat[1] = $dateFormat[0] . ' ' . $formatter->convertPhpFormatToLuxon($GLOBALS['TYPO3_CONF_VARS']['SYS']['hhmm'] ?? 'H:i');
         $pageRenderer->addInlineSetting('DateTimePicker', 'DateFormat', $dateFormat);
 
-        $buttonBar = $this->view->getModuleTemplate()->getDocHeaderComponent()->getButtonBar();
+        $buttonBar = $this->moduleTemplate->getDocHeaderComponent()->getButtonBar();
 
-        $uriBuilder = $this->objectManager->get(UriBuilder::class);
+        $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
         $uriBuilder->setRequest($this->request);
 
-        $view->assignMultiple([
-            't3DateTimeFormat' => $GLOBALS['TYPO3_CONF_VARS']['SYS']['ddmmyy'] . ' ' . $GLOBALS['TYPO3_CONF_VARS']['SYS']['hhmm']
+        $this->moduleTemplate->assignMultiple([
+            't3DateTimeFormat' => $GLOBALS['TYPO3_CONF_VARS']['SYS']['ddmmyy'].' '.$GLOBALS['TYPO3_CONF_VARS']['SYS']['hhmm'],
         ]);
 
         $buttonList = [
@@ -66,37 +76,37 @@ class AdministrationController extends ActionController
                 'action' => 'index',
                 'icon' => 'actions-system-list-open',
                 'position' => ButtonBar::BUTTON_POSITION_LEFT,
-                'group' => 1
+                'group' => 1,
             ],
             [
                 'action' => 'search',
                 'icon' => 'actions-search',
                 'position' => ButtonBar::BUTTON_POSITION_LEFT,
-                'group' => 1
+                'group' => 1,
             ],
             [
                 'action' => 'formOverview',
                 'icon' => 'ext-gdpr-form-overview',
                 'position' => ButtonBar::BUTTON_POSITION_LEFT,
-                'group' => 1
+                'group' => 1,
             ],
             [
                 'action' => 'log',
                 'icon' => 'actions-document-open-read-only',
                 'position' => ButtonBar::BUTTON_POSITION_LEFT,
-                'group' => 2
+                'group' => 2,
             ],
             [
                 'action' => 'configuration',
                 'icon' => 'actions-system-extension-configure',
                 'position' => ButtonBar::BUTTON_POSITION_RIGHT,
-                'group' => 1
+                'group' => 1,
             ],
             [
                 'action' => 'help',
                 'icon' => 'actions-system-help-open',
                 'position' => ButtonBar::BUTTON_POSITION_RIGHT,
-                'group' => 2
+                'group' => 2,
             ],
         ];
 
@@ -104,7 +114,7 @@ class AdministrationController extends ActionController
 
         foreach ($buttonList as $buttonDefinition) {
             $button = $buttonBar->makeLinkButton()
-                ->setIcon($iconFactory->getIcon($buttonDefinition['icon'], Icon::SIZE_SMALL))
+                ->setIcon($iconFactory->getIcon($buttonDefinition['icon'], IconSize::SMALL))
                 ->setTitle($buttonDefinition['icon'])
                 ->setHref($uriBuilder
                     ->reset()
@@ -113,7 +123,7 @@ class AdministrationController extends ActionController
         }
     }
 
-    public function indexAction()
+    public function indexAction(): ResponseInterface
     {
         $tables = TableInformation::getAllEnabledTables();
 
@@ -124,84 +134,68 @@ class AdministrationController extends ActionController
             $collectedRows[$table]['meta'] = Table::getInstance($table);
         }
 
-        $this->view->assignMultiple([
+        $this->moduleTemplate->assignMultiple([
             'tables' => $tables,
-            'restrictedData' => $collectedRows
+            'restrictedData' => $collectedRows,
         ]);
+
+        return $this->moduleTemplate->renderResponse('Administration/Index');
     }
 
-    /**
-     * @param string $table
-     * @param int $id
-     */
-    public function deleteAction(string $table, int $id)
+    public function deleteAction(string $table, int $uid): ResponseInterface
     {
-        $this->recordRepository->deleteRecord($table, $id);
+        $this->recordRepository->deleteRecord($table, $uid);
         $this->addFlashMessage('deleted');
-        $this->forward('index');
+
+        return new ForwardResponse('index');
     }
 
-    /**
-     * @param string $table
-     * @param int $id
-     */
-    public function reenableAction(string $table, int $id)
+    public function reenableAction(string $table, int $uid): ResponseInterface
     {
-        $this->recordRepository->enableRecord($table, $id);
+        $this->recordRepository->enableRecord($table, $uid);
         $this->addFlashMessage('reenabled');
-        $this->forward('index');
 
+        return new ForwardResponse('index');
     }
 
-    /**
-     * @param string $table
-     * @param int $id
-     */
-    public function disableAction(string $table, int $id)
+    public function disableAction(string $table, int $uid): ResponseInterface
     {
-        $this->recordRepository->disableRecord($table, $id);
+        $this->recordRepository->disableRecord($table, $uid);
         $this->addFlashMessage('disabled');
-        $this->forward('index');
 
+        return new ForwardResponse('index');
     }
 
-    /**
-     * @param string $table
-     * @param int $id
-     */
-    public function randomizeAction(string $table, int $id)
+    public function randomizeAction(string $table, int $uid): ResponseInterface
     {
-        $this->recordRepository->randomizeRecord($table, $id);
-        $this->addFlashMessage(sprintf('The record with id %d from table "%s" has been randomized', $id, $table));
-        $this->forward('index');
+        $this->recordRepository->randomizeRecord($table, $uid);
+        $this->addFlashMessage(sprintf('The record with id %d from table "%s" has been randomized', $uid, $table));
+
+        return new ForwardResponse('index');
     }
 
-    /**
-     * @param \GeorgRinger\Gdpr\Domain\Model\Dto\Search $search
-     */
-    public function searchAction(Search $search = null)
+    public function searchAction(?Search $search = null): ResponseInterface
     {
         $searchPerformed = false;
-        if ($search === null) {
-            $search = $this->objectManager->get(Search::class);
+        if (!$search instanceof Search) {
+            $search = GeneralUtility::makeInstance(Search::class);
         } else {
             $searchPerformed = true;
         }
 
-        $this->view->assignMultiple([
+        $this->moduleTemplate->assignMultiple([
             'search' => $search,
             'result' => $this->recordRepository->search($search),
             'searchPerformed' => $searchPerformed,
         ]);
+
+        return $this->moduleTemplate->renderResponse('Administration/Search');
     }
 
-    /**
-     * @param \GeorgRinger\Gdpr\Domain\Model\Dto\LogFilter $filter
-     */
-    public function logAction(LogFilter $filter = null)
+    public function logAction(?LogFilter $filter = null): ResponseInterface
     {
-        if ($filter === null) {
-            $filter = $this->objectManager->get(LogFilter::class);
+        if (!$filter instanceof LogFilter) {
+            $filter = GeneralUtility::makeInstance(LogFilter::class);
         }
 
         $allTableNames = [];
@@ -209,38 +203,42 @@ class AdministrationController extends ActionController
             $allTableNames[$tableName] = $tableName;
         }
 
-        $this->view->assignMultiple([
+        $this->moduleTemplate->assignMultiple([
             'allTableNames' => $allTableNames,
             'filter' => $filter,
             'result' => GeneralUtility::makeInstance(LogRepository::class)->filter($filter),
         ]);
+
+        return $this->moduleTemplate->renderResponse('Administration/Log');
     }
 
-    public function formOverviewAction()
+    public function formOverviewAction(): ResponseInterface
     {
         $formRepository = GeneralUtility::makeInstance(FormRepository::class);
-        $this->view->assignMultiple([
+        $this->moduleTemplate->assignMultiple([
             'forms' => $formRepository->getAllForms(),
             'previewCount' => FormRepository::LOG_COUNT_PREVIEW,
         ]);
+
+        return $this->moduleTemplate->renderResponse('Administration/FormOverview');
     }
 
     /**
-     * @param string $type type
-     * @param int $formId form
-     * @param int $status status
+     * @param string $type   type
+     * @param int    $formId form
+     * @param int    $status status
      */
-    public function formStatusUpdateAction(string $type, int $formId, int $status)
+    public function formStatusUpdateAction(string $type, int $formId, int $status): ResponseInterface
     {
         $formRepository = GeneralUtility::makeInstance(FormRepository::class);
-        $formRepository->setStatus($type, $formId, (bool)$status);
+        $formRepository->setStatus($type, $formId, (bool) $status);
 
-        $this->addFlashMessage(sprintf('The form of content element %s has been updated ', $id));
-        $this->forward('formOverview');
+        $this->addFlashMessage(sprintf('The form of content element %s has been updated ', $formId));
+
+        return new ForwardResponse('formOverview');
     }
 
-
-    public function configurationAction()
+    public function configurationAction(): ResponseInterface
     {
         $allTables = TableInformation::getAllEnabledTables();
 
@@ -249,27 +247,26 @@ class AdministrationController extends ActionController
             $information[$tableName] = Table::getInstance($tableName);
         }
 
-        $this->view->assignMultiple([
-            'tables' => $information
+        $this->moduleTemplate->assignMultiple([
+            'tables' => $information,
         ]);
+
+        return $this->moduleTemplate->renderResponse('Administration/Configuration');
     }
 
     /**
-     * View which shows information if current user got no access
+     * View which shows information if current user got no access.
      */
-    public function moduleNotEnabledAction()
+    public function moduleNotEnabledAction(): ResponseInterface
     {
-
+        return $this->moduleTemplate->renderResponse('Administration/ModuleNotEnabled');
     }
 
-    public function helpAction()
+    public function helpAction(): ResponseInterface
     {
-
+        return $this->moduleTemplate->renderResponse('Administration/Help');
     }
 
-    /**
-     * @return BackendUserAuthentication
-     */
     protected function getBackendUser(): BackendUserAuthentication
     {
         return $GLOBALS['BE_USER'];

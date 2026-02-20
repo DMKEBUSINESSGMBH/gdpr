@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace GeorgRinger\Gdpr\Domain\Model\Dto;
@@ -9,7 +10,6 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class ExtensionConfiguration implements SingletonInterface
 {
-
     /** @var string */
     protected $randomizerLocale = 'en_US';
 
@@ -22,32 +22,25 @@ class ExtensionConfiguration implements SingletonInterface
             $settings = GeneralUtility::makeInstance(ExtensionConfigurationCore::class)->get('gdpr');
             if (!empty($settings)) {
                 $this->randomizerLocale = $settings['randomizerLocale'];
-                $this->overloadMediaRenderer = isset($settings['overloadMediaRenderer']) ? (bool)$settings['overloadMediaRenderer'] : true;
+                $this->overloadMediaRenderer = isset($settings['overloadMediaRenderer']) ? (bool) $settings['overloadMediaRenderer'] : true;
             }
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             // do nothing
         }
     }
 
-    /**
-     * @return string
-     */
     public function getRandomizerLocale(): string
     {
         return $this->randomizerLocale;
     }
 
-    /**
-     * @return bool
-     */
     public function getOverloadMediaRenderer(): bool
     {
         return $this->overloadMediaRenderer;
     }
 
-    public static function getInstance()
+    public static function getInstance(): object
     {
-        return GeneralUtility::makeInstance(__CLASS__);
+        return GeneralUtility::makeInstance(self::class);
     }
-
 }

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace GeorgRinger\Gdpr\Domain\Model\Dto;
@@ -7,9 +8,9 @@ use TYPO3\CMS\Core\Utility\MathUtility;
 
 class LogFilter
 {
+    public const DEFAULT_LIMIT = 50;
 
-    const DEFAULT_LIMIT = 50;
-    const MAX_LIMIT = 200;
+    public const MAX_LIMIT = 200;
 
     /** @var string */
     protected $tableName = '';
@@ -26,25 +27,16 @@ class LogFilter
     /** @var int */
     protected $limit = self::DEFAULT_LIMIT;
 
-    /**
-     * @return string
-     */
     public function getTableName(): string
     {
         return $this->tableName;
     }
 
-    /**
-     * @param string $tableName
-     */
-    public function setTableName(string $tableName)
+    public function setTableName(string $tableName): void
     {
         $this->tableName = $tableName;
     }
 
-    /**
-     * @return int
-     */
     public function getStatus(): int
     {
         return $this->status;
@@ -53,46 +45,31 @@ class LogFilter
     /**
      * @param int $status
      */
-    public function setStatus($status = 0)
+    public function setStatus($status = 0): void
     {
-        $this->status = (int)$status;
+        $this->status = (int) $status;
     }
 
-    /**
-     * @return string
-     */
     public function getDateFrom(): string
     {
         return $this->dateFrom;
     }
 
-    /**
-     * @param string $dateFrom
-     */
-    public function setDateFrom(string $dateFrom)
+    public function setDateFrom(string $dateFrom): void
     {
         $this->dateFrom = $dateFrom;
     }
 
-    /**
-     * @return string
-     */
     public function getDateTo(): string
     {
         return $this->dateTo;
     }
 
-    /**
-     * @param string $dateTo
-     */
-    public function setDateTo(string $dateTo)
+    public function setDateTo(string $dateTo): void
     {
         $this->dateTo = $dateTo;
     }
 
-    /**
-     * @return int
-     */
     public function getLimit(): int
     {
         return MathUtility::forceIntegerInRange($this->limit, 10, self::MAX_LIMIT, self::DEFAULT_LIMIT);
@@ -101,9 +78,8 @@ class LogFilter
     /**
      * @param int $limit
      */
-    public function setLimit($limit)
+    public function setLimit($limit): void
     {
-        $this->limit = (int)$limit;
+        $this->limit = (int) $limit;
     }
-
 }

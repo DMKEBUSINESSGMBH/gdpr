@@ -1,6 +1,6 @@
 <?php
-defined('TYPO3_MODE') or die();
 
+defined('TYPO3') || exit;
 
 $fields = [
     'gdpr_module_enable' => [
@@ -10,25 +10,25 @@ $fields = [
             'renderType' => 'checkboxLabeledToggle',
             'items' => [
                 [
-                    0 => '',
+                    'label' => '',
                     1 => '',
                     'labelChecked' => 'LLL:EXT:core/Resources/Private/Language/locallang_general.xlf:LGL.enabled',
-                    'labelUnchecked' => 'LLL:EXT:core/Resources/Private/Language/locallang_general.xlf:LGL.disabled'
+                    'labelUnchecked' => 'LLL:EXT:core/Resources/Private/Language/locallang_general.xlf:LGL.disabled',
                 ],
             ],
-        ]
-    ]
+        ],
+    ],
 ];
 
-\TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addTCAcolumns('be_users', $fields);
-\TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addToAllTCAtypes(
+TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addTCAcolumns('be_users', $fields);
+TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addToAllTCAtypes(
     'be_users',
     'gdpr_module_enable',
     '',
     'before:disableIPlock'
 );
 
-$tca = \GeorgRinger\Gdpr\Service\Tca::getInstance('be_users');
+$tca = GeorgRinger\Gdpr\Service\Tca::getInstance('be_users');
 $tca
     ->addRestriction('gdpr_restricted')
     ->add('after:disable');

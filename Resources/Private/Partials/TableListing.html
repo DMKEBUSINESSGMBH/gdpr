@@ -52,7 +52,7 @@
                         <f:then>
                             <f:link.action
                                     action="reenable"
-                                    arguments="{id:row.uid,table:table}"
+                                    arguments="{uid:row.uid,table:table}"
                                     class="btn btn-default t3js-modal-trigger"
                                     data="{
 													toggle:'tooltip',
@@ -66,7 +66,7 @@
                         <f:else>
                             <f:link.action
                                     action="disable"
-                                    arguments="{id:row.uid,table:table}"
+                                    arguments="{uid:row.uid,table:table}"
                                     class="btn btn-default t3js-modal-trigger"
                                     data="{
 													toggle:'tooltip',
@@ -83,7 +83,7 @@
                         <f:then>
                             <f:link.action
                                     action="randomize"
-                                    arguments="{id:row.uid,table:table}"
+                                    arguments="{uid:row.uid,table:table}"
                                     class="btn btn-default t3js-modal-trigger"
                                     data="{
 													toggle:'tooltip',
@@ -101,7 +101,7 @@
 
                     <f:link.action
                             action="delete"
-                            arguments="{id:row.uid,table:table}"
+                            arguments="{uid:row.uid,table:table}"
                             class="btn btn-default t3js-modal-trigger"
                             data="{
 													toggle:'tooltip',
