@@ -77,7 +77,8 @@ class RecordRepository extends BaseRepository
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
         $dataHandler->start([], []);
         $dataHandler->disableDeleteClause();
-        $dataHandler->deleteEl($table, $id, true, true);
+        // We need to put an record here, otherwise the "record exists check" fill fail.
+        $dataHandler->deleteEl($table, ['uid' => $id], true, true);
 
         $this->logger->log($table, $id, LogManager::STATUS_DELETE);
     }
